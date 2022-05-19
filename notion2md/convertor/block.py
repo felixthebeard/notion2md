@@ -1,4 +1,5 @@
 import concurrent.futures
+import hashlib
 import os
 import urllib.request as request
 import uuid
@@ -38,57 +39,56 @@ class BlockConvertor:
             and not block["has_children"]
             and not block[block_type]["text"]
         ):
-            outcome_block = blank() + "\n\n"
+            return blank() + "\n\n"
+        # Normal Case
+        if block_type in BLOCK_TYPES:
+            outcome_block = (
+                self.get_md_from_block_type(block, block_type) + "\n\n"
+            )
         else:
-            if block_type in BLOCK_TYPES:
-                outcome_block = (
-                    BLOCK_TYPES[block_type](
-                        self.collect_info(block[block_type])
-                    )
-                    + "\n\n"
-                )
+            outcome_block = f"[//]: # ({block_type} is not supported)\n\n"
+        # Convert child block
+        if block["has_children"]:
+            # create child page
+            if block_type == "child_page":
+                # call make_child_function
+                pass
+            # create table block
+            elif block_type == "table":
+                depth += 1
+                child_blocks = self._client.get_children(block["id"])
+                outcome_block = self.create_table(cell_blocks=child_blocks)
+            # create indent block
             else:
-                outcome_block = f"[{block_type} is not supported]\n\n"
-            if block["has_children"]:
-                if block_type == "child_page":
-                    # call make_child_function
-                    pass
-                elif block_type == "table":
-                    depth += 1
-                    child_blocks = self._client.get_children(block["id"])
-                    table_list = []
-                    for cell_block in child_blocks:
-                        cell_block_type = cell_block["type"]
-                        table_list.append(
-                            BLOCK_TYPES[cell_block_type](
-                                self.collect_info(cell_block[cell_block_type])
-                            )
-                        )
-                    # convert to markdown table
-                    for index, value in enumerate(table_list):
-                        if index == 0:
-                            outcome_block = (
-                                " | " + " | ".join(value) + " | " + "\n"
-                            )
-                            outcome_block += (
-                                " | "
-                                + " | ".join(["----"] * len(value))
-                                + " | "
-                                + "\n"
-                            )
-                            continue
-                        outcome_block += (
-                            " | " + " | ".join(value) + " | " + "\n"
-                        )
-                    outcome_block += "\n"
-                else:
-                    depth += 1
-                    child_blocks = self._client.get_children(block["id"])
-                    for block in child_blocks:
-                        outcome_block += "\t" * depth + self.convert_block(
-                            block, depth
-                        )
+                depth += 1
+                child_blocks = self._client.get_children(block["id"])
+                for block in child_blocks:
+                    outcome_block += "\t" * depth + self.convert_block(
+                        block, depth
+                    )
         return outcome_block
+
+    def get_md_from_block_type(self, block: dict, block_type: str) -> str:
+        return BLOCK_TYPES[block_type](self.collect_info(block[block_type]))
+
+    def create_table(self, cell_blocks: dict):
+        table_list = []
+        for cell_block in cell_blocks:
+            cell_block_type = cell_block["type"]
+            table_list.append(
+                self.get_md_from_block_type(cell_block, cell_block_type)
+            )
+        # convert to markdown table
+        for index, value in enumerate(table_list):
+            if index == 0:
+                table = " | " + " | ".join(value) + " | " + "\n"
+                table += (
+                    " | " + " | ".join(["----"] * len(value)) + " | " + "\n"
+                )
+                continue
+            table += " | " + " | ".join(value) + " | " + "\n"
+        table += "\n"
+        return table
 
     def collect_info(self, payload: dict) -> dict:
         info = dict()
@@ -127,12 +127,16 @@ class BlockConvertor:
         file_name = os.path.basename(urlparse(url).path)
         if self._config.download:
             if file_name:
-                name, extentsion = os.path.splitext(file_name)
+                name, extension = os.path.splitext(file_name)
 
-                if not extentsion:
+                if not extension:
                     return file_name, url
 
-                downloaded_file_name = str(uuid.uuid4())[:8] + extentsion
+                url_hash = hashlib.blake2s(
+                    urlparse(url).path.encode()
+                ).hexdigest()[:8]
+                downloaded_file_name = f"{url_hash}_{file_name}"
+
                 fullpath = os.path.join(
                     self._config.tmp_path, downloaded_file_name
                 )
