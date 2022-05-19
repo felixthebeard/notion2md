@@ -36,7 +36,7 @@ class BlockConvertor:
         if (
             block_type == "paragraph"
             and not block["has_children"]
-            and not block[block_type]["text"]
+            and not block[block_type]["rich_text"]
         ):
             return blank() + "\n\n"
         # Normal Case
@@ -93,6 +93,8 @@ class BlockConvertor:
         info = dict()
         if "text" in payload:
             info["text"] = richtext_convertor(payload["text"])
+        if "rich_text" in payload:
+            info["rich_text"] = richtext_convertor(payload["rich_text"])
         if "icon" in payload:
             info["icon"] = payload["icon"]["emoji"]
         if "checked" in payload:
@@ -160,32 +162,32 @@ class BlockConvertor:
 
 # Converting Methods
 def paragraph(info: dict) -> str:
-    return info["text"]
+    return info["rich_text"]
 
 
 def heading_1(info: dict) -> str:
-    return f"# {info['text']}"
+    return f"# {info['rich_text']}"
 
 
 def heading_2(info: dict) -> str:
-    return f"## {info['text']}"
+    return f"## {info['rich_text']}"
 
 
 def heading_3(info: dict) -> str:
-    return f"### {info['text']}"
+    return f"### {info['rich_text']}"
 
 
 def callout(info: dict) -> str:
-    return f"{info['icon']} {info['text']}"
+    return f"{info['icon']} {info['rich_text']}"
 
 
 def quote(info: dict) -> str:
-    return f"> {info['text']}"
+    return f"> {info['rich_text']}"
 
 
 # toggle item will be changed as bulleted list item
 def bulleted_list_item(info: dict) -> str:
-    return f"- {info['text']}"
+    return f"- {info['rich_text']}"
 
 
 # numbering is not supported
@@ -193,14 +195,14 @@ def numbered_list_item(info: dict) -> str:
     """
     input: item:dict = {"number":int, "text":str}
     """
-    return f"1. {info['text']}"
+    return f"1. {info['rich_text']}"
 
 
 def to_do(info: dict) -> str:
     """
     input: item:dict = {"checked":bool, "test":str}
     """
-    return f"- {'[x]' if info['checked'] else '[ ]'} {info['text']}"
+    return f"- {'[x]' if info['checked'] else '[ ]'} {info['rich_text']}"
 
 
 # not yet supported
@@ -218,7 +220,7 @@ def code(info: dict) -> str:
     """
     input: item:dict = {"language":str,"text":str}
     """
-    return f"\n```{info['language']}\n{info['text']}\n```"
+    return f"\n```{info['language']}\n{info['rich_text']}\n```"
 
 
 def embed(info: dict) -> str:
